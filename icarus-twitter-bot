@@ -1,0 +1,131 @@
+#!/usr/bin/env python3
+
+import click
+import requests
+import tweepy
+import hashlib
+import os
+import sys
+
+from datetime import datetime
+from urllib.parse import urljoin
+
+import settings
+
+
+TWEET_TEMPLATE = '{alerttype}: {message} http://icarus.live/forecast?show=alerts'
+
+
+class IcarusApiClient:
+    BASE_HOST = 'http://icarus.live:8000/'
+
+    URLS = {
+        'alerts': '/api/alerts/',
+        'alert-types': '/api/alerttypes/',
+    }
+
+    BASE_HEADERS = {}
+
+    def __init__(self, host=None):
+        self._host = host or self.BASE_HOST
+        self._headers = self.BASE_HEADERS
+
+    def _get(self, url, params):
+        response = requests.get(url, params=params, headers=self._headers)
+        return response.json()
+
+    def get_alert_types(self, params={}):
+        url = urljoin(self._host, self.URLS.get("alert-types"))
+        return self._get(url, params)
+
+    def get_alerts(self, params={}):
+        url = urljoin(self._host, self.URLS.get("alerts"))
+        return self._get(url, params)
+
+
+@click.command()
+@click.option('--access_token', envvar='TWITTER_ACCESS_TOKEN', default=settings.ACCESS_TOKEN,
+              help="Twitter access token (env. TWITTER_ACCESS_TOKEN)")
+@click.option('--access_secret', envvar='TWITTER_ACCESS_SECRET', default=settings.ACCESS_SECRET,
+              help="Twitter access secret (env. TWITTER_ACCESS_SECRET)")
+@click.option('--consumer_key', envvar='TWITTER_CONSUMER_KEY', default=settings.CONSUMER_KEY,
+              help="Twitter consumer key (env. TWITTER_CONSUMER_KEY)")
+@click.option('--consumer_secret', envvar='TWITTER_CONSUMER_SECRET', default=settings.CONSUMER_SECRET,
+              help="Twitter consumer secret (env. TWITTER_CONSUMER_SECRET)")
+def cli(access_token, access_secret, consumer_key, consumer_secret):
+    """I'm a Twitter bot. I publish alerts about the Space Weather conditions.
+
+    Make no mistake, I have my little heart too ;-)
+    """
+    # Build savepoint (path + file)
+    hashed_hashtag = hashlib.md5(bytes("icarus-alerts", "utf8")).hexdigest()
+    last_alert_id_filename = 'icarus_alert_id_{}'.format(hashed_hashtag)
+    bot_path = os.path.dirname(os.path.abspath(__file__))
+    last_alert_id_file = os.path.join(bot_path, last_alert_id_filename)
+
+    # create twitter bot
+    auth = tweepy.OAuthHandler(consumer_key, consumer_secret)
+    auth.set_access_token(access_token, access_secret)
+    twitter_bot = tweepy.API(auth)
+
+    try:
+        twitter_bot.verify_credentials()
+    except tweepy.error.TweepError:
+        sys.exit('Error: Invalid credentials.\n'
+                 '       Use config file, env vars or command options.\n'
+                 '       Check if consumer_key, consumer_secret, access_token and access_secret are valid.')
+
+    # Retrieve last savepoint if available
+    try:
+        with open(last_alert_id_file, 'r') as file:
+            savepoint_id = file.read()
+    except IOError:
+        savepoint_id = None
+        click.echo('No savepoint found. Trying to public as many results as possible.', err=True)
+
+    # Create icarus client
+    icarus_client = IcarusApiClient()
+
+    # Get alerts
+    alert_types = icarus_client.get_alert_types()
+    alert_types = {t['id']: t['name'] for t in alert_types}
+
+    params = {"date_min": datetime.date(datetime.now())}
+    alerts = icarus_client.get_alerts(params=params)
+
+    if savepoint_id:
+        alerts = filter(lambda a: a['id'] > savepoint_id, alerts)
+
+    alerts = [{
+        'id': a['id'],
+        'alerttype': alert_types[a['alerttype']],
+        'message': a['message']
+    } for a in alerts]
+
+    # iterate the timeline and retweet
+    tw_counter = 0
+    err_counter = 0
+    for alert in alerts:
+        try:
+            click.echo('[{id}] - {alerttype}: {message}'.format(**alert))
+
+            api.update_statu(TWEET_TEMPLATE.format(**alert))
+            tw_counter += 1
+        except tweepy.error.TweepError as e:
+            err_counter += 1
+            continue
+
+    click.echo('Finished. {} Tweets added, {} errors occured.'.format(tw_counter, err_counter))
+
+    # Save last alert id to the file
+    try:
+        last_alert_id = alerts[-1]['id']
+    except IndexError:
+        last_alert_id = savepoint
+
+    with open(last_alert_id_file, 'w') as file:
+        file.write(str(last_alert_id))
+
+
+if __name__ == '__main__':
+    cli()
