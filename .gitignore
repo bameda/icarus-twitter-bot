@@ -63,3 +63,6 @@ target/
 
 # Settings
 settings/local.py
+
+# Savepoints
+icarus_alert_id_*

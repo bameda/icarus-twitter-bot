@@ -94,7 +94,7 @@ def cli(access_token, access_secret, consumer_key, consumer_secret):
     alerts = icarus_client.get_alerts(params=params)
 
     if savepoint_id:
-        alerts = filter(lambda a: a['id'] > savepoint_id, alerts)
+        alerts = filter(lambda a: a['id'] > int(savepoint_id), alerts)
 
     alerts = [{
         'id': a['id'],
@@ -121,7 +121,7 @@ def cli(access_token, access_secret, consumer_key, consumer_secret):
     try:
         last_alert_id = alerts[-1]['id']
     except IndexError:
-        last_alert_id = savepoint
+        last_alert_id = savepoint_id
 
     with open(last_alert_id_file, 'w') as file:
         file.write(str(last_alert_id))
