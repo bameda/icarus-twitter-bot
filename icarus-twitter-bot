@@ -109,7 +109,7 @@ def cli(access_token, access_secret, consumer_key, consumer_secret):
         try:
             click.echo('[{id}] - {alerttype}: {message}'.format(**alert))
 
-            api.update_statu(TWEET_TEMPLATE.format(**alert))
+            twitter_bot.update_statu(TWEET_TEMPLATE.format(**alert))
             tw_counter += 1
         except tweepy.error.TweepError as e:
             err_counter += 1
