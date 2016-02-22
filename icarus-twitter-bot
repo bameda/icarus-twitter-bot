@@ -13,7 +13,7 @@ from urllib.parse import urljoin
 import settings
 
 
-TWEET_TEMPLATE = '{alerttype}: {message} http://icarus.live/forecast?show=alerts'
+TWEET_TEMPLATE = '{issuetime} {alerttype}: {message} http://icarus.live/forecast?show=alerts'
 
 
 class IcarusApiClient:
@@ -99,6 +99,7 @@ def cli(access_token, access_secret, consumer_key, consumer_secret):
     alerts = [{
         'id': a['id'],
         'alerttype': alert_types[a['alerttype']],
+        'issuetime': datetime.strptime(a['issuetime'], '%Y-%m-%dT%H:%M:%S.%fZ').strftime('%Y/%m/%d %H:%M:%S'),
         'message': a['message']
     } for a in alerts]
 
