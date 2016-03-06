@@ -1,6 +1,6 @@
 # icarus-twitter-bot
 
-Bot to publish alerts from http://icarus.live/ in Twitter.
+Bot to publish alerts from http://icarus.live/ in Twitter ([@icarusalerts](https://twitter.com/icarusalerts)).
 
 
 ## Setup
